@@ -5,7 +5,7 @@ import requests
 import sqlite3
 import matplotlib.pyplot as plt
 import seaborn as sns
-
+import pandas as pd
 from bs4 import BeautifulSoup
 
 def get_data_from_url(resource_url: str) -> str:
@@ -80,7 +80,7 @@ def get_html_as_list(table_0):
         table_0 (_OneElement): a BeautifulSoup OneElement object
 
     Returns:
-        The dict with the values
+        The list with the values
     """
 
     data_as_list = []
@@ -96,13 +96,60 @@ def get_html_as_list(table_0):
         value_to_save['year'] = int(year if year else 0)
 
         # get the value in dollars
-        cost = re.sub(" |B|\$", "", str(tds[1].text))
-        value_to_save['value'] = float(cost if cost else 0)
+        revenue = re.sub(" |B|\$", "", str(tds[1].text))
+        value_to_save['revenue'] = float(revenue if revenue else 0)
 
         # get the percent
-        percentage = re.sub("%", "", str(tds[2].text))
-        value_to_save['percentage'] = float(percentage if percentage else 0)
+        change = re.sub("%", "", str(tds[2].text))
+        value_to_save['change'] = float(change if change else 0)
 
         data_as_list.append(value_to_save)
 
     return data_as_list
+
+
+def save_df_to_db(df: pd.DataFrame, db_name: str, table_name: str) -> None:
+    """
+    Save the df to the database
+
+    Ags:
+        df (DataFrame): dataframe to save
+        db_name (str): name of the db to save
+        table_name (str): name of the table to save teh df
+
+    Returns:
+        None
+    """
+
+    # connect to the data base (create the db) if it does not exist
+    conn = sqlite3.connect(f'{db_name}.db')
+
+    # save the df to the data base
+    df.to_sql(table_name, conn, if_exists='replace', index=False)
+    
+    # close the connection
+    conn.close()
+
+
+def get_df_from_db(db_name: str, table_name: str) -> pd.DataFrame:
+    """
+    Get the value of a table as a df
+
+    Ags:
+        db_name (str): database name
+        table_name (str): table name to get the data
+
+    Returns:
+        Df with the values
+    """
+
+    # connect to the data base (create the db) if it does not exist
+    conn = sqlite3.connect(f'{db_name}.db')
+
+    # get the data
+    df_read = pd.read_sql_query(f"SELECT * FROM {table_name}", conn)
+    
+    # close the connection
+    conn.close()
+
+    return df_read

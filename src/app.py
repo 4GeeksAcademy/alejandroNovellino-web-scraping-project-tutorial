@@ -1,12 +1,47 @@
-import os
-import time
 import re
-import requests
 import sqlite3
-import matplotlib.pyplot as plt
-import seaborn as sns
+import requests
 import pandas as pd
 from bs4 import BeautifulSoup
+
+
+def parse_revenue(revenue_str: str):
+    """
+    Parses a revenue string like "$8.73 B" and returns the numerical value as a float.
+
+    Args:
+        revenue_str (str): The revenue string to parse.
+
+    Returns:
+        The numerical value as a float.
+    """
+
+    # verify if the string is empty
+    if not revenue_str:
+        return 0
+
+    # remove '$' and leading/trailing spaces
+    revenue_str = revenue_str.replace('$', '').strip()
+
+    # split into value and unit
+    value, unit = revenue_str.split()  
+
+    # verify if empty
+    if not value:
+        return 0
+    
+    # convert value to float
+    value = float(value)  
+
+    if unit == 'B' or unit == 'Billion':
+        return value * 10**9  # Billion
+    elif unit == 'M' or unit == 'Million':
+        return value * 10**6  # Million
+    elif unit == 'K':
+        return value * 10**3  # Thousand
+    else:
+        return value  # if no unit, assume it's already in base units
+
 
 def get_data_from_url(resource_url: str) -> str:
     """
@@ -23,7 +58,7 @@ def get_data_from_url(resource_url: str) -> str:
     """
 
     # get the data from the URL
-    response = requests.get(resource_url, timeout=time.sleep(10))
+    response = requests.get(resource_url, timeout=5)
 
     # ff the request was executed correctly (code 200), then the file could be downloaded
     if response:
@@ -62,7 +97,7 @@ def get_n_table_from_soup(soup, n: int):
         The n table in the soup
 
     Raises:
-        IndexError: If the idnex does not exist
+        IndexError: If the index does not exist
     """
 
     # get the tables
@@ -72,7 +107,7 @@ def get_n_table_from_soup(soup, n: int):
     return tables[n]
     
 
-def get_html_as_list(table_0):
+def get_html_as_list(table_0, elements_to_sub: 'list[str]'):
     """
     Get the n table from the soup.
 
@@ -83,7 +118,11 @@ def get_html_as_list(table_0):
         The list with the values
     """
 
+    # data tog et from the html
     data_as_list = []
+
+    # regex to use in the substitute
+    regex = '|'.join(elements_to_sub)
 
     for row in table_0.find_all("tr")[1:]:
         # get all the tds
@@ -96,8 +135,8 @@ def get_html_as_list(table_0):
         value_to_save['year'] = int(year if year else 0)
 
         # get the value in dollars
-        revenue = re.sub(" |B|\$", "", str(tds[1].text))
-        value_to_save['revenue'] = float(revenue if revenue else 0)
+        revenue = parse_revenue(str(tds[1].text))
+        value_to_save['revenue'] = revenue
 
         # get the percent
         change = re.sub("%", "", str(tds[2].text))
